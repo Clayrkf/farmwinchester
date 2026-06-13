@@ -52,18 +52,14 @@ async function sendData(action, data) {
     showLoading('Salvando...');
     
     try {
-        // Usa text/plain para evitar problemas de CORS
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'text/plain',
-            },
-            body: JSON.stringify({ action, ...data })
-        });
+        // Constrói URL com parâmetros
+        const params = new URLSearchParams({ action, ...data });
+        const url = API_URL + '?' + params.toString();
         
-        // Como usamos no-cors, não podemos ler a resposta
-        // Então esperamos e recarregamos os dados
+        // Usa GET em vez de POST
+        await fetch(url);
+        
+        // Aguarda e recarrega
         await new Promise(r => setTimeout(r, 2000));
         await loadData();
         hideLoading();
