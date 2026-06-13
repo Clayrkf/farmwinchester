@@ -1,16 +1,12 @@
-// Dados iniciais (Mock Data para não ficar vazio na primeira vez)
+// Dados iniciais
 let members = JSON.parse(localStorage.getItem('winchester_members')) || [
     { id: 1, name: 'Clay', role: 'Líder', routes: 22, totalWashed: 11000000 },
     { id: 2, name: 'Lucas', role: 'Gerente', routes: 20, totalWashed: 10000000 },
-    { id: 3, name: 'João', role: 'Membro', routes: 18, totalWashed: 9000000 },
-    { id: 4, name: 'Pedro', role: 'Membro', routes: 15, totalWashed: 7500000 },
-    { id: 5, name: 'Thiago', role: 'Membro', routes: 14, totalWashed: 7000000 }
+    { id: 3, name: 'João', role: 'Membro', routes: 18, totalWashed: 9000000 }
 ];
 
 let records = JSON.parse(localStorage.getItem('winchester_records')) || [
-    { id: 1, memberId: 1, memberName: 'Clay', routes: 3, valuePerRoute: 500000, total: 1500000, date: '13/06/2026 08:32' },
-    { id: 2, memberId: 2, memberName: 'Lucas', routes: 2, valuePerRoute: 500000, total: 1000000, date: '13/06/2026 07:15' },
-    { id: 3, memberId: 3, memberName: 'João', routes: 4, valuePerRoute: 500000, total: 2000000, date: '12/06/2026 22:45' }
+    { id: 1, memberId: 1, memberName: 'Clay', routes: 3, valuePerRoute: 500000, total: 1500000, date: new Date().toLocaleString('pt-BR') }
 ];
 
 let settings = JSON.parse(localStorage.getItem('winchester_settings')) || {
@@ -25,21 +21,29 @@ let settings = JSON.parse(localStorage.getItem('winchester_settings')) || {
 };
 
 // Navegação
-document.querySelectorAll('.sidebar nav ul li').forEach(item => {
-    item.addEventListener('click', function() {
-        document.querySelectorAll('.sidebar nav ul li').forEach(i => i.classList.remove('active'));
-        this.classList.add('active');
-        
-        const section = this.getAttribute('data-section');
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.getElementById(section).classList.add('active');
-        
-        if (section === 'dashboard') updateDashboard();
-        if (section === 'members') updateMembersTable();
-        if (section === 'ranking') updateRanking();
-        if (section === 'goals') updateGoals();
-        if (section === 'history') updateHistory();
-        if (section === 'register') updateRegisterForm();
+document.addEventListener('DOMContentLoaded', function() {
+    updateDashboard();
+    updateMemberSelects();
+    
+    document.querySelectorAll('.sidebar nav ul li').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.sidebar nav ul li').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            
+            const section = this.getAttribute('data-section');
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(section).classList.add('active');
+            
+            if (section === 'dashboard') updateDashboard();
+            if (section === 'members') updateMembersTable();
+            if (section === 'ranking') updateRanking();
+            if (section === 'goals') updateGoals();
+            if (section === 'history') updateHistory();
+            if (section === 'register') {
+                updateRegisterForm();
+                updateMemberSelects();
+            }
+        });
     });
 });
 
@@ -47,6 +51,7 @@ document.querySelectorAll('.sidebar nav ul li').forEach(item => {
 function openModal() {
     updateMemberSelects();
     document.getElementById('modal').classList.add('active');
+    document.getElementById('modal-routes').value = '';
 }
 
 function closeModal() {
@@ -61,7 +66,6 @@ function closeMemberModal() {
     document.getElementById('member-modal').classList.remove('active');
 }
 
-// Update member selects
 function updateMemberSelects() {
     const selects = ['modal-member', 'reg-member'];
     selects.forEach(selectId => {
@@ -75,35 +79,43 @@ function updateMemberSelects() {
     });
 }
 
-// Quick register
+// Quick register - CORRIGIDO
 function quickRegister(e) {
-    e.preventDefault();
-    const memberId = parseInt(document.getElementById('modal-member').value);
-    const routes = parseInt(document.getElementById('modal-routes').value);
-    const valuePerRoute = parseInt(document.getElementById('modal-value').value);
+    if (e) e.preventDefault();
     
-    if (!memberId || !routes) {
-        alert('Preencha todos os campos!');
-        return;
+    const memberId = document.getElementById('modal-member').value;
+    const routes = document.getElementById('modal-routes').value;
+    const valuePerRoute = document.getElementById('modal-value').value;
+    
+    console.log('Valores:', { memberId, routes, valuePerRoute });
+    
+    if (!memberId || memberId === '' || !routes || routes <= 0) {
+        alert('Por favor, preencha todos os campos corretamente!');
+        return false;
     }
     
-    const member = members.find(m => m.id === memberId);
-    const total = routes * valuePerRoute;
+    const member = members.find(m => m.id == memberId);
+    if (!member) {
+        alert('Membro não encontrado!');
+        return false;
+    }
+    
+    const total = parseInt(routes) * parseInt(valuePerRoute);
     const now = new Date();
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth()+1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const dateStr = now.toLocaleString('pt-BR');
     
     const record = {
         id: Date.now(),
-        memberId: member.id,
+        memberId: parseInt(memberId),
         memberName: member.name,
-        routes: routes,
-        valuePerRoute: valuePerRoute,
+        routes: parseInt(routes),
+        valuePerRoute: parseInt(valuePerRoute),
         total: total,
         date: dateStr
     };
     
     records.push(record);
-    member.routes += routes;
+    member.routes += parseInt(routes);
     member.totalWashed += total;
     
     saveData();
@@ -111,22 +123,24 @@ function quickRegister(e) {
     updateDashboard();
     
     document.getElementById('modal-routes').value = '';
-    alert('Registro salvo com sucesso!');
+    alert('✅ Registro salvo com sucesso!\n\nMembro: ' + member.name + '\nRotas: ' + routes + '\nTotal: ' + formatMoney(total));
+    return false;
 }
 
-// Save register from form
 function saveRegister(e) {
-    e.preventDefault();
-    quickRegister(e);
-    document.getElementById('register-form').reset();
-    document.getElementById('reg-value').value = settings.valuePerRoute;
+    if (e) e.preventDefault();
+    return quickRegister(e);
 }
 
-// Add member
 function addMember(e) {
-    e.preventDefault();
-    const name = document.getElementById('member-name').value;
+    if (e) e.preventDefault();
+    const name = document.getElementById('member-name').value.trim();
     const role = document.getElementById('member-role').value;
+    
+    if (!name) {
+        alert('Digite o nome do membro!');
+        return false;
+    }
     
     const newMember = {
         id: Date.now(),
@@ -144,9 +158,9 @@ function addMember(e) {
     
     document.getElementById('member-name').value = '';
     alert('Membro adicionado com sucesso!');
+    return false;
 }
 
-// Delete member
 function deleteMember(id) {
     if (confirm('Tem certeza que deseja excluir este membro?')) {
         members = members.filter(m => m.id !== id);
@@ -157,24 +171,21 @@ function deleteMember(id) {
     }
 }
 
-// Update register form
 function updateRegisterForm() {
     updateMemberSelects();
     document.getElementById('reg-value').value = settings.valuePerRoute;
 }
 
-// Update dashboard
 function updateDashboard() {
     document.getElementById('total-members').textContent = members.length;
-    document.getElementById('weekly-goal').textContent = `${settings.weeklyGoal} rotas`;
+    document.getElementById('weekly-goal').textContent = settings.weeklyGoal + ' rotas';
     
-    const totalRoutes = records.reduce((sum, r) => sum + r.routes, 0);
-    const totalWashed = records.reduce((sum, r) => sum + r.total, 0);
+    const totalRoutes = records.reduce((sum, r) => sum + parseInt(r.routes), 0);
+    const totalWashed = records.reduce((sum, r) => sum + parseInt(r.total), 0);
     
     document.getElementById('total-routes-week').textContent = totalRoutes;
     document.getElementById('total-washed').textContent = formatMoney(totalWashed);
     
-    // Calculate distributions
     const familyBox = totalWashed * ((settings.familyPercent + settings.vipPercent) / 100);
     const membersPaid = totalWashed * (settings.memberPercent / 100);
     const machineBox = totalWashed * (settings.machinePercent / 100);
@@ -185,10 +196,7 @@ function updateDashboard() {
     document.getElementById('machine-box').textContent = formatMoney(machineBox);
     document.getElementById('client-paid').textContent = formatMoney(clientPaid);
     
-    // Top farmers
     updateTopFarmers();
-    
-    // Last record
     updateLastRecord();
 }
 
@@ -196,11 +204,17 @@ function updateTopFarmers() {
     const sorted = [...members].sort((a, b) => b.routes - a.routes).slice(0, 5);
     const container = document.getElementById('top-farmers');
     
+    if (sorted.length === 0) {
+        container.innerHTML = '<p style="color: #888; text-align: center;">Nenhum registro ainda</p>';
+        return;
+    }
+    
     container.innerHTML = sorted.map((member, index) => {
-        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+        const medals = ['🥇', '🥈', '', '4️', '5️⃣'];
+        const medalClass = index < 3 ? ['gold', 'silver', 'bronze'][index] : '';
         return `
             <div class="ranking-item" style="margin-bottom: 10px;">
-                <div class="ranking-position ${index < 3 ? ['gold', 'silver', 'bronze'][index] : ''}">
+                <div class="ranking-position ${medalClass}">
                     ${medals[index]}
                 </div>
                 <div class="ranking-info">
@@ -218,7 +232,7 @@ function updateTopFarmers() {
 
 function updateLastRecord() {
     if (records.length === 0) {
-        document.getElementById('last-record').innerHTML = '<p>Nenhum registro encontrado</p>';
+        document.getElementById('last-record').innerHTML = '<p style="color: #888;">Nenhum registro encontrado</p>';
         return;
     }
     
@@ -242,13 +256,19 @@ function updateLastRecord() {
     `;
 }
 
-// Update members table
 function updateMembersTable() {
     const tbody = document.getElementById('members-table');
+    if (!tbody) return;
+    
+    if (members.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum membro cadastrado</td></tr>';
+        return;
+    }
+    
     tbody.innerHTML = members.map(member => `
         <tr>
             <td>${member.name}</td>
-            <td><span class="badge">${member.role}</span></td>
+            <td>${member.role}</td>
             <td>${member.routes}</td>
             <td>${formatMoney(member.totalWashed)}</td>
             <td>
@@ -260,15 +280,18 @@ function updateMembersTable() {
     `).join('');
 }
 
-// Update ranking
 function updateRanking() {
     const sorted = [...members].sort((a, b) => b.routes - a.routes);
     const container = document.getElementById('ranking-list');
     
+    if (sorted.length === 0) {
+        container.innerHTML = '<p style="color: #888; text-align: center;">Nenhum registro ainda</p>';
+        return;
+    }
+    
     container.innerHTML = sorted.map((member, index) => {
-        const medals = ['gold', 'silver', 'bronze'];
-        const medalClass = index < 3 ? medals[index] : '';
-        const medal = index < 3 ? ['', '🥈', '🥉'][index] : `${index + 1}º`;
+        const medalClass = index < 3 ? ['gold', 'silver', 'bronze'][index] : '';
+        const medal = index < 3 ? ['🥇', '🥈', ''][index] : `${index + 1}º`;
         const percent = Math.min((member.routes / settings.weeklyGoal) * 100, 100);
         
         return `
@@ -288,27 +311,40 @@ function updateRanking() {
     }).join('');
 }
 
-// Update goals
+// Função CORRIGIDA para metas
 function updateGoals() {
     const container = document.getElementById('goals-list');
+    if (!container) return;
     
-    // Calculate daily and weekly progress for each member
-    const today = new Date().toDateString();
-    const weeklyStart = getWeekStart();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const weeklyStart = new Date();
+    weeklyStart.setDate(weeklyStart.getDate() - weeklyStart.getDay() + (weeklyStart.getDay() === 0 ? -6 : 1));
+    weeklyStart.setHours(0, 0, 0, 0);
+    
+    if (members.length === 0) {
+        container.innerHTML = '<p style="color: #888; text-align: center;">Nenhum membro cadastrado</p>';
+        return;
+    }
     
     container.innerHTML = members.map(member => {
         const todayRecords = records.filter(r => {
-            const recordDate = new Date(r.date.split('/').reverse().join('-'));
-            return r.memberId === member.id && recordDate.toDateString() === today;
+            if (!r.date) return false;
+            const recordDate = new Date(r.date);
+            recordDate.setHours(0, 0, 0, 0);
+            return r.memberId == member.id && recordDate.getTime() === today.getTime();
         });
         
         const weeklyRecords = records.filter(r => {
-            const recordDate = new Date(r.date.split('/').reverse().join('-'));
-            return r.memberId === member.id && recordDate >= weeklyStart;
+            if (!r.date) return false;
+            const recordDate = new Date(r.date);
+            recordDate.setHours(0, 0, 0, 0);
+            return r.memberId == member.id && recordDate >= weeklyStart;
         });
         
-        const dailyRoutes = todayRecords.reduce((sum, r) => sum + r.routes, 0);
-        const weeklyRoutes = weeklyRecords.reduce((sum, r) => sum + r.routes, 0);
+        const dailyRoutes = todayRecords.reduce((sum, r) => sum + parseInt(r.routes), 0);
+        const weeklyRoutes = weeklyRecords.reduce((sum, r) => sum + parseInt(r.routes), 0);
         
         const dailyPercent = Math.min((dailyRoutes / settings.dailyGoal) * 100, 100);
         const weeklyPercent = Math.min((weeklyRoutes / settings.weeklyGoal) * 100, 100);
@@ -347,17 +383,16 @@ function updateGoals() {
     }).join('');
 }
 
-function getWeekStart() {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(now.setDate(diff));
-}
-
-// Update history
 function updateHistory() {
     const tbody = document.getElementById('history-table');
+    if (!tbody) return;
+    
     const sorted = [...records].sort((a, b) => b.id - a.id);
+    
+    if (sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum registro encontrado</td></tr>';
+        return;
+    }
     
     tbody.innerHTML = sorted.map(record => {
         const client = record.total * (settings.clientPercent / 100);
@@ -379,28 +414,27 @@ function updateHistory() {
     }).join('');
 }
 
-// Save settings
 function saveSettings(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     settings = {
-        valuePerRoute: parseInt(document.getElementById('set-value-per-route').value),
-        dailyGoal: parseInt(document.getElementById('set-daily-goal').value),
-        weeklyGoal: parseInt(document.getElementById('set-weekly-goal').value),
-        clientPercent: parseInt(document.getElementById('set-client').value),
-        machinePercent: parseInt(document.getElementById('set-machine').value),
-        memberPercent: parseInt(document.getElementById('set-member').value),
-        familyPercent: parseInt(document.getElementById('set-family').value),
-        vipPercent: parseInt(document.getElementById('set-vip').value)
+        valuePerRoute: parseInt(document.getElementById('set-value-per-route').value) || 500000,
+        dailyGoal: parseInt(document.getElementById('set-daily-goal').value) || 2,
+        weeklyGoal: parseInt(document.getElementById('set-weekly-goal').value) || 14,
+        clientPercent: parseInt(document.getElementById('set-client').value) || 50,
+        machinePercent: parseInt(document.getElementById('set-machine').value) || 40,
+        memberPercent: parseInt(document.getElementById('set-member').value) || 5,
+        familyPercent: parseInt(document.getElementById('set-family').value) || 5,
+        vipPercent: parseInt(document.getElementById('set-vip').value) || 10
     };
     
     saveData();
-    alert('Configurações salvas com sucesso!');
+    alert('✅ Configurações salvas com sucesso!');
     updateDashboard();
+    return false;
 }
 
-// Clear history
 function clearHistory() {
-    if (confirm('Tem certeza que deseja limpar todo o histórico?')) {
+    if (confirm('⚠️ ATENÇÃO: Tem certeza que deseja limpar todo o histórico? Esta ação não pode ser desfeita!')) {
         records = [];
         members.forEach(m => {
             m.routes = 0;
@@ -409,12 +443,13 @@ function clearHistory() {
         saveData();
         updateHistory();
         updateDashboard();
+        updateGoals();
+        alert('Histórico limpo!');
     }
 }
 
-// Utility functions
 function formatMoney(value) {
-    return 'R$ ' + value.toLocaleString('pt-BR');
+    return 'R$ ' + parseInt(value).toLocaleString('pt-BR');
 }
 
 function saveData() {
@@ -423,13 +458,6 @@ function saveData() {
     localStorage.setItem('winchester_settings', JSON.stringify(settings));
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    updateDashboard();
-    updateMemberSelects();
-});
-
-// Close modals on outside click
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
         event.target.classList.remove('active');
