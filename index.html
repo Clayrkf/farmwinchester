@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WINCHESTER - Painel de Controle</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <h1>WINCHESTER</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active" data-section="dashboard">
+                        <i class="fas fa-home"></i> Dashboard
+                    </li>
+                    <li data-section="members">
+                        <i class="fas fa-users"></i> Membros
+                    </li>
+                    <li data-section="register">
+                        <i class="fas fa-plus-circle"></i> Registrar
+                    </li>
+                    <li data-section="ranking">
+                        <i class="fas fa-trophy"></i> Ranking
+                    </li>
+                    <li data-section="goals">
+                        <i class="fas fa-bullseye"></i> Metas
+                    </li>
+                    <li data-section="history">
+                        <i class="fas fa-history"></i> Histórico
+                    </li>
+                    <li data-section="settings">
+                        <i class="fas fa-cog"></i> Configurações
+                    </li>
+                </ul>
+            </nav>
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-name">
+                    <span id="current-user">Clay</span>
+                    <small>Líder</small>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <header class="section-header">
+                    <h2><i class="fas fa-home"></i> Dashboard</h2>
+                    <button class="btn-primary" onclick="openModal()">
+                        <i class="fas fa-plus"></i> Registrar Rota
+                    </button>
+                </header>
+
+                <div class="cards-grid">
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-users"></i></div>
+                        <div class="card-info">
+                            <h3>Membros</h3>
+                            <p id="total-members">0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-bullseye"></i></div>
+                        <div class="card-info">
+                            <h3>Meta Semanal</h3>
+                            <p id="weekly-goal">14 rotas</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-box"></i></div>
+                        <div class="card-info">
+                            <h3>Rotas Semana</h3>
+                            <p id="total-routes-week">0</p>
+                        </div>
+                    </div>
+                    <div class="card highlight">
+                        <div class="card-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="card-info">
+                            <h3>Total Lavado</h3>
+                            <p id="total-washed">R$ 0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-university"></i></div>
+                        <div class="card-info">
+                            <h3>Caixa Família</h3>
+                            <p id="family-box">R$ 0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-user"></i></div>
+                        <div class="card-info">
+                            <h3>Pago Membros</h3>
+                            <p id="members-paid">R$ 0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-microchip"></i></div>
+                        <div class="card-info">
+                            <h3>Caixa Máquina</h3>
+                            <p id="machine-box">R$ 0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i class="fas fa-handshake"></i></div>
+                        <div class="card-info">
+                            <h3>Pago Cliente</h3>
+                            <p id="client-paid">R$ 0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-bottom">
+                    <div class="ranking-preview">
+                        <h3><i class="fas fa-trophy"></i> Top Farmadores</h3>
+                        <div id="top-farmers"></div>
+                    </div>
+                    <div class="last-record">
+                        <h3><i class="fas fa-clock"></i> Último Registro</h3>
+                        <div id="last-record"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Members Section -->
+            <section id="members" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-users"></i> Membros</h2>
+                    <button class="btn-primary" onclick="openMemberModal()">
+                        <i class="fas fa-plus"></i> Adicionar Membro
+                    </button>
+                </header>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Cargo</th>
+                                <th>Rotas Totais</th>
+                                <th>Total Lavado</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-table"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Register Section -->
+            <section id="register" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-plus-circle"></i> Registrar Rotas</h2>
+                </header>
+                <div class="form-container">
+                    <form id="register-form" onsubmit="saveRegister(event)">
+                        <div class="form-group">
+                            <label>Membro</label>
+                            <select id="reg-member" required>
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantidade de Rotas</label>
+                            <input type="number" id="reg-routes" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor por Rota</label>
+                            <input type="number" id="reg-value" value="500000" required>
+                        </div>
+                        <button type="submit" class="btn-primary btn-large">
+                            <i class="fas fa-save"></i> Salvar Registro
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Ranking Section -->
+            <section id="ranking" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-trophy"></i> Ranking</h2>
+                </header>
+                <div id="ranking-list"></div>
+            </section>
+
+            <!-- Goals Section -->
+            <section id="goals" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-bullseye"></i> Metas</h2>
+                </header>
+                <div id="goals-list"></div>
+            </section>
+
+            <!-- History Section -->
+            <section id="history" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-history"></i> Histórico</h2>
+                    <button class="btn-danger" onclick="clearHistory()">
+                        <i class="fas fa-trash"></i> Limpar
+                    </button>
+                </header>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Membro</th>
+                                <th>Rotas</th>
+                                <th>Total</th>
+                                <th>Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="section">
+                <header class="section-header">
+                    <h2><i class="fas fa-cog"></i> Configurações</h2>
+                </header>
+                <div class="form-container">
+                    <form id="settings-form" onsubmit="saveSettings(event)">
+                        <h3>Valores</h3>
+                        <div class="form-group">
+                            <label>Valor por Rota</label>
+                            <input type="number" id="set-value-per-route" value="500000">
+                        </div>
+                        
+                        <h3>Metas</h3>
+                        <div class="form-group">
+                            <label>Meta Diária</label>
+                            <input type="number" id="set-daily-goal" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label>Meta Semanal</label>
+                            <input type="number" id="set-weekly-goal" value="14">
+                        </div>
+
+                        <h3>Porcentagens</h3>
+                        <div class="form-group">
+                            <label>Cliente (%)</label>
+                            <input type="number" id="set-client" value="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Máquina (%)</label>
+                            <input type="number" id="set-machine" value="40">
+                        </div>
+                        <div class="form-group">
+                            <label>Membro (%)</label>
+                            <input type="number" id="set-member" value="5">
+                        </div>
+                       
