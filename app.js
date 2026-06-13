@@ -52,7 +52,6 @@ async function sendData(action, data) {
     showLoading('Salvando...');
     
     try {
-        // Constrói URL com parâmetros GET
         const params = new URLSearchParams({ action: action });
         Object.keys(data).forEach(key => {
             params.append(key, data[key]);
@@ -61,13 +60,8 @@ async function sendData(action, data) {
         const url = API_URL + '?' + params.toString();
         console.log('Enviando:', url);
         
-        // Usa GET em vez de POST
         await fetch(url);
-        
-        // Aguarda 2 segundos para o Google processar
         await new Promise(r => setTimeout(r, 2000));
-        
-        // Recarrega os dados
         await loadData();
         
         hideLoading();
@@ -108,8 +102,10 @@ function updateCurrentSection() {
     if (section === 'settings') loadSettings();
 }
 
+// ============ MEMBROS ============
+
 async function addMember(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const name = document.getElementById('member-name').value.trim();
     const role = document.getElementById('member-role').value;
     
@@ -132,14 +128,17 @@ async function deleteMember(id) {
     if (success) alert('✅ Membro excluído!');
 }
 
+// ============ REGISTRO DE ROTAS ============
+
+// Função para o MODAL (popup)
 async function quickRegister(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
     const memberId = document.getElementById('modal-member').value;
     const routes = document.getElementById('modal-routes').value;
     const valuePerRoute = parseInt(document.getElementById('modal-value').value) || 500000;
     
-    if (!memberId || !routes || routes <= 0) {
+    if (!memberId || memberId === '' || !routes || routes === '' || routes <= 0) {
         alert('Preencha todos os campos!');
         return;
     }
@@ -167,10 +166,44 @@ async function quickRegister(e) {
     }
 }
 
-function saveRegister(e) {
-    e.preventDefault();
-    quickRegister(e);
+// Função para o FORMULÁRIO da aba Registrar
+async function saveRegister(e) {
+    if (e) e.preventDefault();
+    
+    const memberId = document.getElementById('reg-member').value;
+    const routes = document.getElementById('reg-routes').value;
+    const valuePerRoute = parseInt(document.getElementById('reg-value').value) || 500000;
+    
+    console.log('Valores do formulário:', { memberId, routes, valuePerRoute });
+    
+    if (!memberId || memberId === '' || !routes || routes === '' || routes <= 0) {
+        alert('Preencha todos os campos!\n\nMembro: "' + memberId + '"\nRotas: "' + routes + '"');
+        return;
+    }
+    
+    const member = members.find(m => m.ID == memberId);
+    if (!member) {
+        alert('Membro não encontrado!');
+        return;
+    }
+    
+    const total = parseInt(routes) * valuePerRoute;
+    
+    const success = await sendData('addRecord', {
+        memberId: Number(memberId),
+        memberName: member.Nome,
+        routes: parseInt(routes),
+        valuePerRoute: valuePerRoute,
+        total: total
+    });
+    
+    if (success) {
+        document.getElementById('reg-routes').value = '';
+        alert('✅ Registro salvo!\n' + member.Nome + ' - ' + routes + ' rotas\n' + formatMoney(total));
+    }
 }
+
+// ============ MODAIS ============
 
 function openModal() {
     updateMemberSelects();
@@ -207,6 +240,8 @@ function updateRegisterForm() {
     updateMemberSelects();
     document.getElementById('reg-value').value = settings.valuePerRoute;
 }
+
+// ============ DASHBOARD ============
 
 function updateDashboard() {
     document.getElementById('total-members').textContent = members.length;
@@ -269,6 +304,8 @@ function updateLastRecord() {
         </div>`;
 }
 
+// ============ TABELA MEMBROS ============
+
 function updateMembersTable() {
     const tbody = document.getElementById('members-table');
     if (!tbody) return;
@@ -289,6 +326,8 @@ function updateMembersTable() {
     `).join('');
 }
 
+// ============ RANKING ============
+
 function updateRanking() {
     const sorted = [...members].sort((a, b) => (Number(b.Rotas) || 0) - (Number(a.Rotas) || 0));
     const container = document.getElementById('ranking-list');
@@ -300,7 +339,7 @@ function updateRanking() {
     
     container.innerHTML = sorted.map((m, i) => {
         const cls = i < 3 ? ['gold','silver','bronze'][i] : '';
-        const medal = i < 3 ? ['🥇','🥈','🥉'][i] : `${i+1}º`;
+        const medal = i < 3 ? ['🥇','','🥉'][i] : `${i+1}º`;
         const routes = Number(m.Rotas) || 0;
         const pct = Math.min((routes / settings.weeklyGoal) * 100, 100);
         
@@ -316,6 +355,8 @@ function updateRanking() {
         </div>`;
     }).join('');
 }
+
+// ============ METAS ============
 
 function updateGoals() {
     const container = document.getElementById('goals-list');
@@ -365,6 +406,8 @@ function updateGoals() {
     }).join('');
 }
 
+// ============ HISTÓRICO ============
+
 function updateHistory() {
     const tbody = document.getElementById('history-table');
     if (!tbody) return;
@@ -388,6 +431,8 @@ function updateHistory() {
     }).join('');
 }
 
+// ============ CONFIGURAÇÕES ============
+
 function loadSettings() {
     document.getElementById('set-value-per-route').value = settings.valuePerRoute;
     document.getElementById('set-daily-goal').value = settings.dailyGoal;
@@ -400,7 +445,7 @@ function loadSettings() {
 }
 
 async function saveSettings(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
     const success = await sendData('updateSettings', {
         valuePerRoute: parseInt(document.getElementById('set-value-per-route').value) || 500000,
@@ -416,11 +461,15 @@ async function saveSettings(e) {
     if (success) alert('✅ Configurações salvas!');
 }
 
+// ============ LIMPAR ============
+
 async function clearHistory() {
     if (!confirm('⚠️ LIMPAR TUDO?')) return;
     const success = await sendData('clearHistory', {});
     if (success) alert('✅ Histórico limpo!');
 }
+
+// ============ HELPERS ============
 
 function formatMoney(v) {
     return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR');
