@@ -1,5 +1,5 @@
 // ============================================
-// API WINCHESTER - GOOGLE SHEETS SYNC
+// API WINCHESTER - GOOGLE SHEETS SYNC (v2)
 // ============================================
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyTO20AHtg5bexiywVKw6acM7OKyJcxQ-tAK0mJqu2OljrMj0Z-hZHIdpSprLIFbPww/exec';
@@ -73,13 +73,16 @@ function updateCurrentSection() {
 
 async function loadAllData() {
     try {
-        const response = await fetch(API_URL + '?action=getAll');
+        const response = await fetch(API_URL + '?action=getAll', {
+            method: 'GET',
+            redirect: 'follow'
+        });
         const result = await response.json();
         
-        if (result.success) {
-            members = result.data.members || [];
-            records = result.data.records || [];
-            settings = { ...settings, ...result.data.settings };
+        if (result && result.members !== undefined) {
+            members = result.members || [];
+            records = result.records || [];
+            settings = { ...settings, ...(result.settings || {}) };
             
             // Converter valores para número
             members.forEach(m => {
@@ -101,18 +104,25 @@ async function loadAllData() {
         }
     } catch (err) {
         console.error('❌ Erro ao carregar dados:', err);
-        alert('Erro ao conectar com o servidor. Verifique sua conexão.');
     }
 }
 
 async function apiPost(action, data) {
     try {
-        const response = await fetch(API_URL, {
+        const formData = new FormData();
+        formData.append('data', JSON.stringify({ action, ...data }));
+        
+        await fetch(API_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ...data })
+            body: formData,
+            redirect: 'follow'
         });
+        
+        // Espera 1 segundo para o Google Sheets processar
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Recarrega os dados
+        await loadAllData();
         return true;
     } catch (err) {
         console.error('❌ Erro na API:', err);
@@ -187,9 +197,9 @@ async function quickRegister(e) {
     });
     
     if (success) {
-        await loadAllData();
         closeModal();
         updateDashboard();
+        updateMembersTable();
         document.getElementById('modal-routes').value = '';
         hideLoading();
         alert('✅ Registro salvo com sucesso!\n\nMembro: ' + member.Nome + '\nRotas: ' + routes + '\nTotal: ' + formatMoney(total));
@@ -222,7 +232,6 @@ async function addMember(e) {
     const success = await apiPost('addMember', { name, role });
     
     if (success) {
-        await loadAllData();
         closeMemberModal();
         updateMembersTable();
         updateDashboard();
@@ -246,7 +255,6 @@ async function deleteMember(id) {
     const success = await apiPost('deleteMember', { id: parseInt(id) });
     
     if (success) {
-        await loadAllData();
         updateMembersTable();
         updateDashboard();
         hideLoading();
@@ -546,7 +554,6 @@ async function saveSettings(e) {
     
     if (success) {
         settings = newSettings;
-        await loadAllData();
         updateDashboard();
         hideLoading();
         alert('✅ Configurações salvas com sucesso!');
@@ -574,7 +581,6 @@ async function clearHistory() {
     const success = await apiPost('clearHistory', {});
     
     if (success) {
-        await loadAllData();
         updateHistory();
         updateDashboard();
         updateGoals();
