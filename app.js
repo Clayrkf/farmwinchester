@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbxQwfakaonyI5R5gas_xcPeOcYkaGX0Ol_nCsGgfwK6ACBJRcw22nb6x1RNbah9Wm0_jg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxiDmscK411AP60M-_A6ChjlUjKT6qNPpjv6WXv7MJ7tpgxgoaktyjetwX9rWzzzWkJ/exec';
 
 let members = [];
 let records = [];
@@ -43,7 +43,6 @@ async function loadData() {
         console.log('✅ Dados carregados:', members.length, 'membros');
     } catch (err) {
         console.error('❌ Erro:', err);
-        alert('Erro ao carregar dados!');
     }
     
     isLoading = false;
@@ -72,7 +71,7 @@ async function sendData(action, data) {
             throw new Error(result.error || 'Erro desconhecido');
         }
     } catch (err) {
-        console.error(' Erro:', err);
+        console.error('❌ Erro:', err);
         hideLoading();
         alert('Erro ao salvar: ' + err.message);
         return false;
@@ -235,7 +234,7 @@ function updateTopFarmers() {
     }
     
     container.innerHTML = sorted.map((m, i) => {
-        const medals = ['🥇','','🥉','4️','5️⃣'];
+        const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
         const cls = i < 3 ? ['gold','silver','bronze'][i] : '';
         return `<div class="ranking-item" style="margin-bottom:10px">
             <div class="ranking-position ${cls}">${medals[i]}</div>
@@ -298,7 +297,7 @@ function updateRanking() {
     
     container.innerHTML = sorted.map((m, i) => {
         const cls = i < 3 ? ['gold','silver','bronze'][i] : '';
-        const medal = i < 3 ? ['','🥈','🥉'][i] : `${i+1}º`;
+        const medal = i < 3 ? ['🥇','🥈','🥉'][i] : `${i+1}º`;
         const routes = Number(m.Rotas) || 0;
         const pct = Math.min((routes / settings.weeklyGoal) * 100, 100);
         
