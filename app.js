@@ -1,15 +1,12 @@
-// Dados iniciais
-let members = JSON.parse(localStorage.getItem('winchester_members')) || [
-    { id: 1, name: 'Clay', role: 'Líder', routes: 22, totalWashed: 11000000 },
-    { id: 2, name: 'Lucas', role: 'Gerente', routes: 20, totalWashed: 10000000 },
-    { id: 3, name: 'João', role: 'Membro', routes: 18, totalWashed: 9000000 }
-];
+// ============================================
+// API WINCHESTER - GOOGLE SHEETS SYNC
+// ============================================
 
-let records = JSON.parse(localStorage.getItem('winchester_records')) || [
-    { id: 1, memberId: 1, memberName: 'Clay', routes: 3, valuePerRoute: 500000, total: 1500000, date: new Date().toLocaleString('pt-BR') }
-];
+const API_URL = 'https://script.google.com/macros/s/AKfycbyTO20AHtg5bexiywVKw6acM7OKyJcxQ-tAK0mJqu2OljrMj0Z-hZHIdpSprLIFbPww/exec';
 
-let settings = JSON.parse(localStorage.getItem('winchester_settings')) || {
+let members = [];
+let records = [];
+let settings = {
     valuePerRoute: 500000,
     dailyGoal: 2,
     weeklyGoal: 14,
@@ -20,11 +17,17 @@ let settings = JSON.parse(localStorage.getItem('winchester_settings')) || {
     vipPercent: 10
 };
 
-// Navegação
-document.addEventListener('DOMContentLoaded', function() {
+// ============ INICIALIZAÇÃO ============
+
+document.addEventListener('DOMContentLoaded', async function() {
+    showLoading('Carregando dados...');
+    await loadAllData();
+    hideLoading();
+    
     updateDashboard();
     updateMemberSelects();
     
+    // Navegação
     document.querySelectorAll('.sidebar nav ul li').forEach(item => {
         item.addEventListener('click', function() {
             document.querySelectorAll('.sidebar nav ul li').forEach(i => i.classList.remove('active'));
@@ -43,11 +46,83 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateRegisterForm();
                 updateMemberSelects();
             }
+            if (section === 'settings') loadSettings();
         });
     });
+    
+    // Auto-refresh a cada 30 segundos
+    setInterval(async () => {
+        await loadAllData();
+        updateCurrentSection();
+    }, 30000);
 });
 
-// Modal functions
+function updateCurrentSection() {
+    const active = document.querySelector('.sidebar nav ul li.active');
+    if (active) {
+        const section = active.getAttribute('data-section');
+        if (section === 'dashboard') updateDashboard();
+        if (section === 'members') updateMembersTable();
+        if (section === 'ranking') updateRanking();
+        if (section === 'goals') updateGoals();
+        if (section === 'history') updateHistory();
+    }
+}
+
+// ============ API CALLS ============
+
+async function loadAllData() {
+    try {
+        const response = await fetch(API_URL + '?action=getAll');
+        const result = await response.json();
+        
+        if (result.success) {
+            members = result.data.members || [];
+            records = result.data.records || [];
+            settings = { ...settings, ...result.data.settings };
+            
+            // Converter valores para número
+            members.forEach(m => {
+                m.Rotas = Number(m.Rotas) || 0;
+                m.TotalLavado = Number(m.TotalLavado) || 0;
+            });
+            
+            records.forEach(r => {
+                r.Rotas = Number(r.Rotas) || 0;
+                r.ValorRota = Number(r.ValorRota) || 0;
+                r.Total = Number(r.Total) || 0;
+            });
+            
+            Object.keys(settings).forEach(key => {
+                settings[key] = Number(settings[key]) || settings[key];
+            });
+            
+            console.log('✅ Dados carregados:', { members: members.length, records: records.length });
+        }
+    } catch (err) {
+        console.error('❌ Erro ao carregar dados:', err);
+        alert('Erro ao conectar com o servidor. Verifique sua conexão.');
+    }
+}
+
+async function apiPost(action, data) {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...data })
+        });
+        return true;
+    } catch (err) {
+        console.error('❌ Erro na API:', err);
+        alert('Erro ao salvar dados. Tente novamente.');
+        return false;
+    }
+}
+
+// ============ MODAL FUNCTIONS ============
+
 function openModal() {
     updateMemberSelects();
     document.getElementById('modal').classList.add('active');
@@ -73,57 +148,55 @@ function updateMemberSelects() {
         if (select) {
             select.innerHTML = '<option value="">Selecione...</option>';
             members.forEach(member => {
-                select.innerHTML += `<option value="${member.id}">${member.name} (${member.role})</option>`;
+                select.innerHTML += `<option value="${member.ID}">${member.Nome} (${member.Cargo})</option>`;
             });
         }
     });
 }
 
-// Quick register - CORRIGIDO
-function quickRegister(e) {
+// ============ REGISTRO ============
+
+async function quickRegister(e) {
     if (e) e.preventDefault();
     
     const memberId = document.getElementById('modal-member').value;
     const routes = document.getElementById('modal-routes').value;
     const valuePerRoute = document.getElementById('modal-value').value;
     
-    console.log('Valores:', { memberId, routes, valuePerRoute });
-    
-    if (!memberId || memberId === '' || !routes || routes <= 0) {
+    if (!memberId || !routes || routes <= 0) {
         alert('Por favor, preencha todos os campos corretamente!');
         return false;
     }
     
-    const member = members.find(m => m.id == memberId);
+    const member = members.find(m => m.ID == memberId);
     if (!member) {
         alert('Membro não encontrado!');
         return false;
     }
     
     const total = parseInt(routes) * parseInt(valuePerRoute);
-    const now = new Date();
-    const dateStr = now.toLocaleString('pt-BR');
     
-    const record = {
-        id: Date.now(),
+    showLoading('Salvando registro...');
+    
+    const success = await apiPost('addRecord', {
         memberId: parseInt(memberId),
-        memberName: member.name,
+        memberName: member.Nome,
         routes: parseInt(routes),
         valuePerRoute: parseInt(valuePerRoute),
-        total: total,
-        date: dateStr
-    };
+        total: total
+    });
     
-    records.push(record);
-    member.routes += parseInt(routes);
-    member.totalWashed += total;
+    if (success) {
+        await loadAllData();
+        closeModal();
+        updateDashboard();
+        document.getElementById('modal-routes').value = '';
+        hideLoading();
+        alert('✅ Registro salvo com sucesso!\n\nMembro: ' + member.Nome + '\nRotas: ' + routes + '\nTotal: ' + formatMoney(total));
+    } else {
+        hideLoading();
+    }
     
-    saveData();
-    closeModal();
-    updateDashboard();
-    
-    document.getElementById('modal-routes').value = '';
-    alert('✅ Registro salvo com sucesso!\n\nMembro: ' + member.name + '\nRotas: ' + routes + '\nTotal: ' + formatMoney(total));
     return false;
 }
 
@@ -132,7 +205,9 @@ function saveRegister(e) {
     return quickRegister(e);
 }
 
-function addMember(e) {
+// ============ MEMBROS ============
+
+async function addMember(e) {
     if (e) e.preventDefault();
     const name = document.getElementById('member-name').value.trim();
     const role = document.getElementById('member-role').value;
@@ -142,46 +217,53 @@ function addMember(e) {
         return false;
     }
     
-    const newMember = {
-        id: Date.now(),
-        name: name,
-        role: role,
-        routes: 0,
-        totalWashed: 0
-    };
+    showLoading('Adicionando membro...');
     
-    members.push(newMember);
-    saveData();
-    closeMemberModal();
-    updateMembersTable();
-    updateDashboard();
+    const success = await apiPost('addMember', { name, role });
     
-    document.getElementById('member-name').value = '';
-    alert('Membro adicionado com sucesso!');
+    if (success) {
+        await loadAllData();
+        closeMemberModal();
+        updateMembersTable();
+        updateDashboard();
+        document.getElementById('member-name').value = '';
+        hideLoading();
+        alert('✅ Membro adicionado com sucesso!');
+    } else {
+        hideLoading();
+    }
+    
     return false;
 }
 
-function deleteMember(id) {
-    if (confirm('Tem certeza que deseja excluir este membro?')) {
-        members = members.filter(m => m.id !== id);
-        records = records.filter(r => r.memberId !== id);
-        saveData();
+async function deleteMember(id) {
+    if (!confirm('⚠️ Tem certeza que deseja excluir este membro? Todos os registros dele serão apagados!')) {
+        return;
+    }
+    
+    showLoading('Excluindo membro...');
+    
+    const success = await apiPost('deleteMember', { id: parseInt(id) });
+    
+    if (success) {
+        await loadAllData();
         updateMembersTable();
         updateDashboard();
+        hideLoading();
+        alert('✅ Membro excluído!');
+    } else {
+        hideLoading();
     }
 }
 
-function updateRegisterForm() {
-    updateMemberSelects();
-    document.getElementById('reg-value').value = settings.valuePerRoute;
-}
+// ============ DASHBOARD ============
 
 function updateDashboard() {
     document.getElementById('total-members').textContent = members.length;
     document.getElementById('weekly-goal').textContent = settings.weeklyGoal + ' rotas';
     
-    const totalRoutes = records.reduce((sum, r) => sum + parseInt(r.routes), 0);
-    const totalWashed = records.reduce((sum, r) => sum + parseInt(r.total), 0);
+    const totalRoutes = records.reduce((sum, r) => sum + (Number(r.Rotas) || 0), 0);
+    const totalWashed = records.reduce((sum, r) => sum + (Number(r.Total) || 0), 0);
     
     document.getElementById('total-routes-week').textContent = totalRoutes;
     document.getElementById('total-washed').textContent = formatMoney(totalWashed);
@@ -201,7 +283,7 @@ function updateDashboard() {
 }
 
 function updateTopFarmers() {
-    const sorted = [...members].sort((a, b) => b.routes - a.routes).slice(0, 5);
+    const sorted = [...members].sort((a, b) => (Number(b.Rotas) || 0) - (Number(a.Rotas) || 0)).slice(0, 5);
     const container = document.getElementById('top-farmers');
     
     if (sorted.length === 0) {
@@ -210,18 +292,19 @@ function updateTopFarmers() {
     }
     
     container.innerHTML = sorted.map((member, index) => {
-        const medals = ['🥇', '🥈', '', '4️', '5️⃣'];
+        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
         const medalClass = index < 3 ? ['gold', 'silver', 'bronze'][index] : '';
+        const routes = Number(member.Rotas) || 0;
         return `
             <div class="ranking-item" style="margin-bottom: 10px;">
                 <div class="ranking-position ${medalClass}">
                     ${medals[index]}
                 </div>
                 <div class="ranking-info">
-                    <div class="ranking-name">${member.name}</div>
+                    <div class="ranking-name">${member.Nome}</div>
                     <div class="ranking-progress">
-                        <div class="ranking-bar" style="width: ${Math.min((member.routes / settings.weeklyGoal) * 100, 100)}%">
-                            ${member.routes} rotas
+                        <div class="ranking-bar" style="width: ${Math.min((routes / settings.weeklyGoal) * 100, 100)}%">
+                            ${routes} rotas
                         </div>
                     </div>
                 </div>
@@ -237,24 +320,27 @@ function updateLastRecord() {
     }
     
     const last = records[records.length - 1];
-    const client = last.total * (settings.clientPercent / 100);
-    const machine = last.total * (settings.machinePercent / 100);
-    const member = last.total * (settings.memberPercent / 100);
-    const family = last.total * ((settings.familyPercent + settings.vipPercent) / 100);
+    const total = Number(last.Total) || 0;
+    const client = total * (settings.clientPercent / 100);
+    const machine = total * (settings.machinePercent / 100);
+    const member = total * (settings.memberPercent / 100);
+    const family = total * ((settings.familyPercent + settings.vipPercent) / 100);
     
     document.getElementById('last-record').innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
-            <div><strong>Membro:</strong> ${last.memberName}</div>
-            <div><strong>Rotas:</strong> ${last.routes}</div>
-            <div><strong>Total:</strong> ${formatMoney(last.total)}</div>
+            <div><strong>Membro:</strong> ${last.MemberName}</div>
+            <div><strong>Rotas:</strong> ${last.Rotas}</div>
+            <div><strong>Total:</strong> ${formatMoney(total)}</div>
             <div><strong>Cliente:</strong> ${formatMoney(client)}</div>
             <div><strong>Máquina:</strong> ${formatMoney(machine)}</div>
             <div><strong>Membro:</strong> ${formatMoney(member)}</div>
             <div><strong>Família:</strong> ${formatMoney(family)}</div>
-            <div><strong>Data:</strong> ${last.date}</div>
+            <div><strong>Data:</strong> ${last.Data}</div>
         </div>
     `;
 }
+
+// ============ MEMBROS TABLE ============
 
 function updateMembersTable() {
     const tbody = document.getElementById('members-table');
@@ -267,12 +353,12 @@ function updateMembersTable() {
     
     tbody.innerHTML = members.map(member => `
         <tr>
-            <td>${member.name}</td>
-            <td>${member.role}</td>
-            <td>${member.routes}</td>
-            <td>${formatMoney(member.totalWashed)}</td>
+            <td>${member.Nome}</td>
+            <td>${member.Cargo}</td>
+            <td>${member.Rotas}</td>
+            <td>${formatMoney(member.TotalLavado)}</td>
             <td>
-                <button class="btn-danger" onclick="deleteMember(${member.id})" style="padding: 5px 10px; font-size: 12px;">
+                <button class="btn-danger" onclick="deleteMember(${member.ID})" style="padding: 5px 10px; font-size: 12px;">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -280,8 +366,10 @@ function updateMembersTable() {
     `).join('');
 }
 
+// ============ RANKING ============
+
 function updateRanking() {
-    const sorted = [...members].sort((a, b) => b.routes - a.routes);
+    const sorted = [...members].sort((a, b) => (Number(b.Rotas) || 0) - (Number(a.Rotas) || 0));
     const container = document.getElementById('ranking-list');
     
     if (sorted.length === 0) {
@@ -291,15 +379,16 @@ function updateRanking() {
     
     container.innerHTML = sorted.map((member, index) => {
         const medalClass = index < 3 ? ['gold', 'silver', 'bronze'][index] : '';
-        const medal = index < 3 ? ['🥇', '🥈', ''][index] : `${index + 1}º`;
-        const percent = Math.min((member.routes / settings.weeklyGoal) * 100, 100);
+        const medal = index < 3 ? ['🥇', '🥈', '🥉'][index] : `${index + 1}º`;
+        const routes = Number(member.Rotas) || 0;
+        const percent = Math.min((routes / settings.weeklyGoal) * 100, 100);
         
         return `
             <div class="ranking-item">
                 <div class="ranking-position ${medalClass}">${medal}</div>
                 <div class="ranking-info">
-                    <div class="ranking-name">${member.name} <small style="color: #888;">(${member.role})</small></div>
-                    <div style="color: var(--primary); font-weight: bold;">${member.routes} rotas - ${formatMoney(member.totalWashed)} lavado</div>
+                    <div class="ranking-name">${member.Nome} <small style="color: #888;">(${member.Cargo})</small></div>
+                    <div style="color: var(--primary); font-weight: bold;">${routes} rotas - ${formatMoney(member.TotalLavado)} lavado</div>
                     <div class="ranking-progress">
                         <div class="ranking-bar" style="width: ${percent}%">
                             ${percent.toFixed(0)}% da meta
@@ -311,7 +400,8 @@ function updateRanking() {
     }).join('');
 }
 
-// Função CORRIGIDA para metas
+// ============ METAS ============
+
 function updateGoals() {
     const container = document.getElementById('goals-list');
     if (!container) return;
@@ -330,21 +420,27 @@ function updateGoals() {
     
     container.innerHTML = members.map(member => {
         const todayRecords = records.filter(r => {
-            if (!r.date) return false;
-            const recordDate = new Date(r.date);
-            recordDate.setHours(0, 0, 0, 0);
-            return r.memberId == member.id && recordDate.getTime() === today.getTime();
+            if (!r.Data) return false;
+            try {
+                const parts = r.Data.split(' ')[0].split('/');
+                const recordDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                recordDate.setHours(0, 0, 0, 0);
+                return r.MemberID == member.ID && recordDate.getTime() === today.getTime();
+            } catch { return false; }
         });
         
         const weeklyRecords = records.filter(r => {
-            if (!r.date) return false;
-            const recordDate = new Date(r.date);
-            recordDate.setHours(0, 0, 0, 0);
-            return r.memberId == member.id && recordDate >= weeklyStart;
+            if (!r.Data) return false;
+            try {
+                const parts = r.Data.split(' ')[0].split('/');
+                const recordDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                recordDate.setHours(0, 0, 0, 0);
+                return r.MemberID == member.ID && recordDate >= weeklyStart;
+            } catch { return false; }
         });
         
-        const dailyRoutes = todayRecords.reduce((sum, r) => sum + parseInt(r.routes), 0);
-        const weeklyRoutes = weeklyRecords.reduce((sum, r) => sum + parseInt(r.routes), 0);
+        const dailyRoutes = todayRecords.reduce((sum, r) => sum + (Number(r.Rotas) || 0), 0);
+        const weeklyRoutes = weeklyRecords.reduce((sum, r) => sum + (Number(r.Rotas) || 0), 0);
         
         const dailyPercent = Math.min((dailyRoutes / settings.dailyGoal) * 100, 100);
         const weeklyPercent = Math.min((weeklyRoutes / settings.weeklyGoal) * 100, 100);
@@ -355,7 +451,7 @@ function updateGoals() {
         return `
             <div class="goal-item">
                 <div class="goal-header">
-                    <div class="goal-name">${member.name}</div>
+                    <div class="goal-name">${member.Nome}</div>
                     <div class="goal-status ${weeklySuccess ? 'success' : 'fail'}">
                         ${weeklySuccess ? '✅ Meta Semanal' : '❌ Meta Semanal'}
                     </div>
@@ -383,11 +479,13 @@ function updateGoals() {
     }).join('');
 }
 
+// ============ HISTÓRICO ============
+
 function updateHistory() {
     const tbody = document.getElementById('history-table');
     if (!tbody) return;
     
-    const sorted = [...records].sort((a, b) => b.id - a.id);
+    const sorted = [...records].sort((a, b) => b.ID - a.ID);
     
     if (sorted.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum registro encontrado</td></tr>';
@@ -395,17 +493,18 @@ function updateHistory() {
     }
     
     tbody.innerHTML = sorted.map(record => {
-        const client = record.total * (settings.clientPercent / 100);
-        const machine = record.total * (settings.machinePercent / 100);
-        const member = record.total * (settings.memberPercent / 100);
-        const family = record.total * ((settings.familyPercent + settings.vipPercent) / 100);
+        const total = Number(record.Total) || 0;
+        const client = total * (settings.clientPercent / 100);
+        const machine = total * (settings.machinePercent / 100);
+        const member = total * (settings.memberPercent / 100);
+        const family = total * ((settings.familyPercent + settings.vipPercent) / 100);
         
         return `
             <tr>
-                <td>${record.date}</td>
-                <td>${record.memberName}</td>
-                <td>${record.routes}</td>
-                <td>${formatMoney(record.total)}</td>
+                <td>${record.Data}</td>
+                <td>${record.MemberName}</td>
+                <td>${record.Rotas}</td>
+                <td>${formatMoney(total)}</td>
                 <td style="font-size: 12px;">
                     Cli: ${formatMoney(client)} | Máq: ${formatMoney(machine)} | Mem: ${formatMoney(member)} | Fam: ${formatMoney(family)}
                 </td>
@@ -414,9 +513,23 @@ function updateHistory() {
     }).join('');
 }
 
-function saveSettings(e) {
+// ============ CONFIGURAÇÕES ============
+
+function loadSettings() {
+    document.getElementById('set-value-per-route').value = settings.valuePerRoute;
+    document.getElementById('set-daily-goal').value = settings.dailyGoal;
+    document.getElementById('set-weekly-goal').value = settings.weeklyGoal;
+    document.getElementById('set-client').value = settings.clientPercent;
+    document.getElementById('set-machine').value = settings.machinePercent;
+    document.getElementById('set-member').value = settings.memberPercent;
+    document.getElementById('set-family').value = settings.familyPercent;
+    document.getElementById('set-vip').value = settings.vipPercent;
+}
+
+async function saveSettings(e) {
     if (e) e.preventDefault();
-    settings = {
+    
+    const newSettings = {
         valuePerRoute: parseInt(document.getElementById('set-value-per-route').value) || 500000,
         dailyGoal: parseInt(document.getElementById('set-daily-goal').value) || 2,
         weeklyGoal: parseInt(document.getElementById('set-weekly-goal').value) || 14,
@@ -427,35 +540,73 @@ function saveSettings(e) {
         vipPercent: parseInt(document.getElementById('set-vip').value) || 10
     };
     
-    saveData();
-    alert('✅ Configurações salvas com sucesso!');
-    updateDashboard();
+    showLoading('Salvando configurações...');
+    
+    const success = await apiPost('updateSettings', newSettings);
+    
+    if (success) {
+        settings = newSettings;
+        await loadAllData();
+        updateDashboard();
+        hideLoading();
+        alert('✅ Configurações salvas com sucesso!');
+    } else {
+        hideLoading();
+    }
+    
     return false;
 }
 
-function clearHistory() {
-    if (confirm('⚠️ ATENÇÃO: Tem certeza que deseja limpar todo o histórico? Esta ação não pode ser desfeita!')) {
-        records = [];
-        members.forEach(m => {
-            m.routes = 0;
-            m.totalWashed = 0;
-        });
-        saveData();
+function updateRegisterForm() {
+    updateMemberSelects();
+    document.getElementById('reg-value').value = settings.valuePerRoute;
+}
+
+// ============ LIMPAR HISTÓRICO ============
+
+async function clearHistory() {
+    if (!confirm('⚠️ ATENÇÃO: Tem certeza que deseja limpar TODO o histórico? Esta ação NÃO pode ser desfeita!')) {
+        return;
+    }
+    
+    showLoading('Limpando histórico...');
+    
+    const success = await apiPost('clearHistory', {});
+    
+    if (success) {
+        await loadAllData();
         updateHistory();
         updateDashboard();
         updateGoals();
-        alert('Histórico limpo!');
+        hideLoading();
+        alert('✅ Histórico limpo!');
+    } else {
+        hideLoading();
     }
 }
 
+// ============ HELPERS ============
+
 function formatMoney(value) {
-    return 'R$ ' + parseInt(value).toLocaleString('pt-BR');
+    return 'R$ ' + (Number(value) || 0).toLocaleString('pt-BR');
 }
 
-function saveData() {
-    localStorage.setItem('winchester_members', JSON.stringify(members));
-    localStorage.setItem('winchester_records', JSON.stringify(records));
-    localStorage.setItem('winchester_settings', JSON.stringify(settings));
+function showLoading(msg) {
+    let loader = document.getElementById('loading-overlay');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'loading-overlay';
+        loader.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;';
+        loader.innerHTML = '<div style="color:#00FF66;font-size:24px;font-weight:bold;">⏳</div><div id="loading-msg" style="color:#00FF66;margin-top:10px;">Carregando...</div>';
+        document.body.appendChild(loader);
+    }
+    document.getElementById('loading-msg').textContent = msg || 'Carregando...';
+    loader.style.display = 'flex';
+}
+
+function hideLoading() {
+    const loader = document.getElementById('loading-overlay');
+    if (loader) loader.style.display = 'none';
 }
 
 window.onclick = function(event) {
