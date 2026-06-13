@@ -52,24 +52,23 @@ async function sendData(action, data) {
     showLoading('Salvando...');
     
     try {
-        const formData = new FormData();
-        formData.append('data', JSON.stringify({ action, ...data }));
-        
+        // Usa text/plain para evitar problemas de CORS
         const response = await fetch(API_URL, {
             method: 'POST',
-            body: formData
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'text/plain',
+            },
+            body: JSON.stringify({ action, ...data })
         });
         
-        const result = await response.json();
+        // Como usamos no-cors, não podemos ler a resposta
+        // Então esperamos e recarregamos os dados
+        await new Promise(r => setTimeout(r, 2000));
+        await loadData();
+        hideLoading();
+        return true;
         
-        if (result.success) {
-            await new Promise(r => setTimeout(r, 1500));
-            await loadData();
-            hideLoading();
-            return true;
-        } else {
-            throw new Error(result.error || 'Erro desconhecido');
-        }
     } catch (err) {
         console.error('❌ Erro:', err);
         hideLoading();
